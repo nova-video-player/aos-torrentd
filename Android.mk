@@ -18,8 +18,8 @@ include $(CLEAR_VARS)
 LOCAL_SRC_FILES := torrentd.cpp httpd.cpp
 LOCAL_MODULE:= torrentd
 
-LOCAL_CFLAGS += -I$(REPO_TOP_DIR)/native/newboost/boost_1_69_0-$(TARGET_ARCH_ABI) -std=c++11
-LOCAL_LDLIBS= $(REPO_TOP_DIR)/native/newboost/boost_1_69_0-$(TARGET_ARCH_ABI)/stage/lib/libboost_system.a
+LOCAL_CFLAGS += -I$(REPO_TOP_DIR)/native/boost/boost_1_69_0-$(TARGET_ARCH_ABI) -std=c++11
+LOCAL_LDLIBS= $(REPO_TOP_DIR)/native/boost/boost_1_69_0-$(TARGET_ARCH_ABI)/stage/lib/libboost_system.a
 
 LOCAL_CFLAGS += -I$(REPO_TOP_DIR)/native/libtorrent/include
 LOCAL_LDLIBS += $(REPO_TOP_DIR)/native/libtorrent/bin-$(TARGET_ARCH_ABI)/clang-android/release/boost-source/link-static/threading-multi/libtorrent.a
