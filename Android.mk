@@ -18,18 +18,18 @@ include $(CLEAR_VARS)
 LOCAL_SRC_FILES := torrentd.cpp httpd.cpp
 LOCAL_MODULE:= torrentd
 
-LOCAL_CFLAGS += -I$(REPO_TOP_DIR)/native/boost/build-$(TARGET_ARCH_ABI)/include/boost-1_55 -std=c++11
-LOCAL_LDLIBS= $(REPO_TOP_DIR)/native/boost/build-$(TARGET_ARCH_ABI)/lib/libboost_system-gcc-mt-1_55.a
+LOCAL_CFLAGS += -I$(REPO_TOP_DIR)/native/newboost/boost_1_69_0-$(TARGET_ARCH_ABI) -std=c++11
+LOCAL_LDLIBS= $(REPO_TOP_DIR)/native/newboost/boost_1_69_0-$(TARGET_ARCH_ABI)/stage/lib/libboost_system.a
 
 LOCAL_CFLAGS += -I$(REPO_TOP_DIR)/native/libtorrent/include
-LOCAL_LDLIBS += $(REPO_TOP_DIR)/native/libtorrent//bin-$(TARGET_ARCH_ABI)/gcc-androidR8e/release/boost-source/link-static/threading-multi/libtorrent.a
+LOCAL_LDLIBS += $(REPO_TOP_DIR)/native/libtorrent/bin-$(TARGET_ARCH_ABI)/clang-android/release/boost-source/link-static/threading-multi/libtorrent.a
 
-LOCAL_LDLIBS += $(android_ndk)/sources/cxx-stl/gnu-libstdc++/4.9/libs/$(TARGET_ARCH_ABI)/libgnustl_static.a
+LOCAL_LDLIBS += $(android_ndk)/sources/cxx-stl/llvm-libc++/libs/$(TARGET_ARCH_ABI)/libc++_static.a
 LOCAL_LDLIBS += -lstdc++ -latomic
 
 LOCAL_CPPFLAGS += -fexceptions
-LOCAL_CPPFLAGS += -frtti -std=gnu++11
-LOCAL_CXXFLAGS += -std=gnu++11
+LOCAL_CPPFLAGS += -frtti -std=c++11
+LOCAL_CXXFLAGS += -std=c++11
 
 LOCAL_MODULE_TAGS := optional
 
