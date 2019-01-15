@@ -21,11 +21,13 @@
 #include <sys/prctl.h>
 #include "libtorrent/alert.hpp"
 #include "libtorrent/alert_types.hpp"
+#include "libtorrent/announce_entry.hpp"
 #include "libtorrent/bencode.hpp"
 #include "libtorrent/entry.hpp"
 #include "libtorrent/magnet_uri.hpp"
 #include "libtorrent/session.hpp"
 #include "libtorrent/time.hpp"
+#include "libtorrent/torrent_info.hpp"
 #include "libtorrent/ip_filter.hpp"
 #include "libtorrent/extensions/lt_trackers.hpp"
 #include "libtorrent/extensions/smart_ban.hpp"
@@ -112,8 +114,8 @@ static int init_torrentd() {
 			in.resize(end);
 			read(loadFd, &in[0], end);
 
-			lazy_entry e;
-			if (lazy_bdecode(&in[0], &in[0] + in.size(), e, ec) == 0) {
+			bdecode_node e;
+			if (bdecode(&in[0], &in[0] + in.size(), e, ec) == 0) {
 				std::cerr << "Loading saved state..." << std::endl;
 				s()->load_state(e);
 			}
@@ -174,11 +176,10 @@ static void add_torrent(const char* torrent) {
 	error_code ec;
 	add_torrent_params p;
 	p.save_path = "./";
-	auto ti = new torrent_info(torrent, ec);
+	p.ti.reset(new torrent_info(torrent, ec));
 	//Try to parse as a file
-	if(!ec) {
-		p.ti = ti;
-	} else {
+	if(ec) {
+        p.ti = nullptr;
 		p.url = torrent;
 		//Don't actually care for error, might just be not a magnet
 		parse_magnet_uri(torrent, p, ec);
@@ -238,7 +239,8 @@ int main(int argc, char* argv[])
 					//Demo: threshold at 100kB/s
 					//i->handle.set_download_limit(100*1024);
 				}
-				if(!i->torrent_file->is_valid()) {
+			    auto torrentInfo = i->torrent_file.lock();
+				if(torrentInfo->is_valid()) {
 					std::cerr << "Torrent not valid yet" << std::endl;
 					continue;
 				}
@@ -247,15 +249,14 @@ int main(int argc, char* argv[])
 				// - Find fileId
 				// - Retrieve static torrent infos
 				if(fileId == -1) {
-					for(int j=0; j<i->torrent_file->num_files(); ++j) {
-						std::cout << i->torrent_file->file_at(j).path.c_str() << std::endl;
+					for(int j=0; j<torrentInfo->num_files(); ++j) {
+						std::cout << torrentInfo->file_at(j).path.c_str() << std::endl;
 					}
 					//Empty line to mark end of list
 					std::cout << std::endl;
 					std::cerr << "More than one file, which one to take ?" << std::endl;
 					std::cin >> fileId;
 
-					auto torrentInfo = i->torrent_file;
 					infos.pieceLength = torrentInfo->piece_length();
 					infos.nTotalPieces = torrentInfo->num_pieces();
 
