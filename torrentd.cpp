@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define BOOST_ASIO_SEPARATE_COMPILATION
 #include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
