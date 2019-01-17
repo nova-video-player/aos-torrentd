@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+os := $(shell echo $(shell uname -s) | tr '[:upper:]' '[:lower:]')
+
 LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
@@ -22,7 +24,7 @@ LOCAL_CFLAGS += -I$(REPO_TOP_DIR)/native/boost/boost_1_69_0-$(TARGET_ARCH_ABI) -
 LOCAL_LDLIBS= $(REPO_TOP_DIR)/native/boost/boost_1_69_0-$(TARGET_ARCH_ABI)/stage/lib/libboost_system.a
 
 LOCAL_CFLAGS += -I$(REPO_TOP_DIR)/native/libtorrent/include
-LOCAL_LDLIBS += $(REPO_TOP_DIR)/native/libtorrent/bin-$(TARGET_ARCH_ABI)/clang-linux-android/release/link-static/threading-multi/libtorrent.a
+LOCAL_LDLIBS += $(REPO_TOP_DIR)/native/libtorrent/bin-$(TARGET_ARCH_ABI)/clang-$(os)-android/release/link-static/threading-multi/libtorrent.a
 
 LOCAL_LDLIBS += $(android_ndk)/sources/cxx-stl/llvm-libc++/libs/$(TARGET_ARCH_ABI)/libc++_static.a
 LOCAL_LDLIBS += -lstdc++ -latomic
