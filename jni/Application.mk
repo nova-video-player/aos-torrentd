@@ -12,6 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-APP_STL := c++_static
-APP_ABI := x86 armeabi-v7a
+APP_STL := c++_shared
+APP_ABI := all
 APP_PLATFORM := android-21
