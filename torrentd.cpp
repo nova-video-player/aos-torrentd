@@ -229,7 +229,7 @@ int main(int argc, char* argv[])
 			continue;
 		}
 
-		std::auto_ptr<alert> alert = s()->pop_alert();
+		std::shared_ptr<alert> alert = s()->pop_alert();
 		if (state_update_alert* p = alert_cast<state_update_alert>(alert.get())) {
 			for (std::vector<torrent_status>::iterator i = p->status.begin();
 					i != p->status.end(); ++i) {
