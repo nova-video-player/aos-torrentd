@@ -239,7 +239,7 @@ int main(int argc, char* argv[])
 					//i->handle.set_download_limit(100*1024);
 				}
 			    auto torrentInfo = i->torrent_file.lock();
-				if(torrentInfo->is_valid()) {
+				if(!torrentInfo->is_valid()) {
 					std::cerr << "Torrent not valid yet" << std::endl;
 					continue;
 				}
