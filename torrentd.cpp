@@ -18,6 +18,7 @@
 #include <string.h>
 #include <linux/prctl.h>
 #include <sys/prctl.h>
+#include <iostream>
 #include "libtorrent/alert.hpp"
 #include "libtorrent/alert_types.hpp"
 #include "libtorrent/announce_entry.hpp"
@@ -28,7 +29,7 @@
 #include "libtorrent/time.hpp"
 #include "libtorrent/torrent_info.hpp"
 #include "libtorrent/ip_filter.hpp"
-#include "libtorrent/extensions/lt_trackers.hpp"
+//#include "libtorrent/extensions/lt_trackers.hpp"
 #include "libtorrent/extensions/smart_ban.hpp"
 #include "libtorrent/extensions/ut_metadata.hpp"
 #include "libtorrent/extensions/ut_pex.hpp"
@@ -88,18 +89,26 @@ void end(int sig) {
 }
 
 static void setup() {
-	session_settings sets = s()->settings();
+	auto pack = s()->get_settings();
 
-	sets.connections_limit = 50;
-	sets.upload_rate_limit = 60*1024;
-	sets.request_timeout = 20;
+	pack.set_int(settings_pack::connections_limit, 50);
+	pack.set_int(settings_pack::upload_rate_limit, 200*1024);
+	pack.set_int(settings_pack::request_timeout, 20);
+	pack.set_str(settings_pack::dht_bootstrap_nodes,
+			"router.bittorrent.com:6881,"
+			"router.utorrent.com:6881,"
+			"router.bitcomet.com:6881,"
+			"dht.transmissionbt.com:6881");
 
-	s()->set_settings(sets);
+	pack.set_int(settings_pack::max_retry_port_bind, 20);
+	pack.set_str(settings_pack::listen_interfaces, "[::]:9042");
+	pack.set_bool(settings_pack::enable_natpmp, true);
+	pack.set_bool(settings_pack::enable_upnp, true);
+	pack.set_bool(settings_pack::enable_lsd, true);
+	pack.set_bool(settings_pack::enable_dht, true);
+	pack.set_int(settings_pack::alert_mask, alert::error_notification);
 
-	s()->add_dht_router(std::make_pair("router.bittorrent.com", 6881));
-	s()->add_dht_router(std::make_pair("router.utorrent.com", 6881));
-	s()->add_dht_router(std::make_pair("router.bitcomet.com", 6881));
-	s()->add_dht_router(std::make_pair("dht.transmissionbt.com", 6881));
+	s()->apply_settings(pack);
 }
 
 static int init_torrentd() {
@@ -113,34 +122,22 @@ static int init_torrentd() {
 			in.resize(end);
 			read(loadFd, &in[0], end);
 
-			bdecode_node e;
-			if (bdecode(&in[0], &in[0] + in.size(), e, ec) == 0) {
+			bdecode_node e = bdecode(in, ec);
+			if(ec) {
+				fprintf(stderr, "failed loading saved state: %s\n", ec.message().c_str());
+			} else {
 				std::cerr << "Loading saved state..." << std::endl;
 				s()->load_state(e);
 			}
 		}
 	}
 
-	s()->start_dht();
-	s()->start_lsd();
-	s()->start_upnp();
-	s()->start_natpmp();
-
 	s()->add_extension(&libtorrent::create_ut_metadata_plugin);
 	s()->add_extension(&libtorrent::create_ut_pex_plugin);
 	s()->add_extension(&libtorrent::create_smart_ban_plugin);
-	s()->add_extension(&libtorrent::create_lt_trackers_plugin);
 
 	setup();
 
-	//s.set_alert_mask(alert::all_categories);
-	s()->set_alert_mask(alert::error_notification);
-	s()->listen_on(std::make_pair(9042, 9053), ec);
-	if (ec)
-	{
-		fprintf(stderr, "failed to open listen socket: %s\n", ec.message().c_str());
-		return 1;
-	}
 	return 0;
 }
 
@@ -178,7 +175,7 @@ static void add_torrent(const char* torrent) {
 	p.ti.reset(new torrent_info(torrent, ec));
 	//Try to parse as a file
 	if(ec) {
-        p.ti = nullptr;
+		p.ti = nullptr;
 		p.url = torrent;
 		//Don't actually care for error, might just be not a magnet
 		parse_magnet_uri(torrent, p, ec);
@@ -229,160 +226,163 @@ int main(int argc, char* argv[])
 			continue;
 		}
 
-		std::shared_ptr<alert> alert = s()->pop_alert();
-		if (state_update_alert* p = alert_cast<state_update_alert>(alert.get())) {
-			for (std::vector<torrent_status>::iterator i = p->status.begin();
-					i != p->status.end(); ++i) {
-				if(!i->sequential_download) {
-					i->handle.set_sequential_download(true);
-					//Demo: threshold at 100kB/s
-					//i->handle.set_download_limit(100*1024);
-				}
-			    auto torrentInfo = i->torrent_file.lock();
-				if(!torrentInfo->is_valid()) {
-					std::cerr << "Torrent not valid yet" << std::endl;
-					continue;
-				}
-
-				// One-time tasks:
-				// - Find fileId
-				// - Retrieve static torrent infos
-				if(fileId == -1) {
-					for(int j=0; j<torrentInfo->num_files(); ++j) {
-						std::cout << torrentInfo->file_at(j).path.c_str() << std::endl;
+		std::vector<alert*> alerts;
+		s()->pop_alerts(&alerts);
+		for(auto alert: alerts) {
+			if (state_update_alert* p = alert_cast<state_update_alert>(alert)) {
+				for (std::vector<torrent_status>::iterator i = p->status.begin();
+						i != p->status.end(); ++i) {
+					auto torrentInfo = i->torrent_file.lock();
+					if(!torrentInfo->is_valid()) {
+						std::cerr << "Torrent not valid yet" << std::endl;
+						continue;
 					}
-					//Empty line to mark end of list
-					std::cout << std::endl;
-					std::cerr << "More than one file, which one to take ?" << std::endl;
-					std::cin >> fileId;
+					auto& hdl = i->handle;
 
-					infos.pieceLength = torrentInfo->piece_length();
-					infos.nTotalPieces = torrentInfo->num_pieces();
-
-					file_entry fileInfo = torrentInfo->file_at(fileId);
-					infos.offset = fileInfo.offset;
-					infos.nPieces = (fileInfo.size + infos.pieceLength - 1)/infos.pieceLength;
-					infos.firstPiece = infos.offset/infos.pieceLength;
-					infos.fileSize = fileInfo.size;
-					infos.lastPiece = (infos.offset + infos.fileSize)/infos.pieceLength;
-					infos.path = strdup(fileInfo.path.c_str());
-
-					auto trackers = torrentInfo->trackers();
-					infos.nTrackers = trackers.size();
-				}
-
-				//Compute pieces priorities
-				std::vector<int> priorities(infos.nTotalPieces, 0);
-				//Please note that streaming mode is on
-				//So early pieces are prefered by default
-				auto ranges = getRanges();
-
-				//Set all pieces in the file to default priority
-				for(int j = infos.firstPiece;
-						j<= infos.lastPiece && j <infos.nTotalPieces;
-						++j)
-					priorities[j] = 1;
-				//We will most likely need the end of the file
-				//Either because of mkv/mp4, or to fingerprint subtitles
-				if(infos.lastPiece >= infos.nTotalPieces) {
-					std::cerr << "lastPiece >= TotalPieces" << std::endl;
-				} else {
-					priorities[infos.lastPiece] = 7;
-				}
-
-				//To support seeking, we do two things:
-				//- Highly prioritize 10MB around current data cursor
-				//- We determine lowest requested byte, so we can null-prioritize data already skipped
-				long long earliest = infos.fileSize;
-				for(auto it = ranges.begin(); it != ranges.end(); ++it) {
-					if(it->first < earliest)
-						earliest = it->first;
-					int TenMB_in_pieces = (10*1024*1024)/infos.pieceLength;
-					if(!TenMB_in_pieces)
-						TenMB_in_pieces = 1;
-					int pieceN = (it->first + infos.offset)/infos.pieceLength;
-
-					//Ask for 10MB max priority
-					//In streaming mode, only priority 7 is taken in account
-					for(int j = 0; j < TenMB_in_pieces; ++j) {
-						int pos = j+pieceN;
-						if( pos > infos.lastPiece)
-							break;
-						priorities[pos] = 7;
+					if(!(hdl.flags() & torrent_flags::sequential_download)) {
+						hdl.set_flags(torrent_flags::sequential_download, torrent_flags::sequential_download);
 					}
-				}
 
-				//If no socket is open yet, assume no seeking
-				if(ranges.empty())
-					earliest = 0;
+					// One-time tasks:
+					// - Find fileId
+					// - Retrieve static torrent infos
+					if(fileId == -1) {
+						auto files = torrentInfo->files();
+						for(int j=0; j<files.num_files(); ++j) {
+							std::cout << files.file_path(j) << std::endl;
+						}
+						//Empty line to mark end of list
+						std::cout << std::endl;
+						std::cerr << "More than one file, which one to take ?" << std::endl;
+						std::cin >> fileId;
 
-				//Now that we have computed priorities, tell libtorrent about it
-				i->handle.prioritize_pieces(priorities);
+						infos.pieceLength = torrentInfo->piece_length();
+						infos.nTotalPieces = torrentInfo->num_pieces();
 
-				int nPeers = i->list_peers;
-				if(nPeers == 0) {
-					if(infos.nTrackers == 0) {
-						nPeers = -1;
-					} else if(i->current_tracker == "") {
-						nPeers = -2;
+						infos.offset = files.file_offset(fileId);
+						infos.nPieces = (files.file_size(fileId) + infos.pieceLength - 1)/infos.pieceLength;
+						infos.firstPiece = infos.offset/infos.pieceLength;
+						infos.fileSize = files.file_size(fileId);
+						infos.lastPiece = (infos.offset + infos.fileSize)/infos.pieceLength;
+						infos.path = strdup(files.file_path(fileId).c_str());
+
+						auto trackers = torrentInfo->trackers();
+						infos.nTrackers = trackers.size();
 					}
-				}
 
-				std::cout
-					<< i->num_peers << ";"
-					<< nPeers << ";"
-					<< i->download_rate << ";"
-					<< i->seed_mode << ";"
-					<< i->total_wanted_done << ";"
-					<< i->total_wanted << ";"
-					<< i->distributed_full_copies << std::endl;
+					//Compute pieces priorities
+					std::vector<int> priorities(infos.nTotalPieces, 0);
+					//Please note that streaming mode is on
+					//So early pieces are prefered by default
+					auto ranges = getRanges();
+
+					//Set all pieces in the file to default priority
+					for(int j = infos.firstPiece;
+							j<= infos.lastPiece && j <infos.nTotalPieces;
+							++j)
+						priorities[j] = 1;
+					//We will most likely need the end of the file
+					//Either because of mkv/mp4, or to fingerprint subtitles
+					if(infos.lastPiece >= infos.nTotalPieces) {
+						std::cerr << "lastPiece >= TotalPieces" << std::endl;
+					} else {
+						priorities[infos.lastPiece] = 7;
+					}
+
+					//To support seeking, we do two things:
+					//- Highly prioritize 10MB around current data cursor
+					//- We determine lowest requested byte, so we can null-prioritize data already skipped
+					long long earliest = infos.fileSize;
+					for(auto it = ranges.begin(); it != ranges.end(); ++it) {
+						if(it->first < earliest)
+							earliest = it->first;
+						int TenMB_in_pieces = (10*1024*1024)/infos.pieceLength;
+						if(!TenMB_in_pieces)
+							TenMB_in_pieces = 1;
+						int pieceN = (it->first + infos.offset)/infos.pieceLength;
+
+						//Ask for 10MB max priority
+						//In streaming mode, only priority 7 is taken in account
+						for(int j = 0; j < TenMB_in_pieces; ++j) {
+							int pos = j+pieceN;
+							if( pos > infos.lastPiece)
+								break;
+							priorities[pos] = 7;
+						}
+					}
+
+					//If no socket is open yet, assume no seeking
+					if(ranges.empty())
+						earliest = 0;
+
+					//Now that we have computed priorities, tell libtorrent about it
+					i->handle.prioritize_pieces(priorities);
+
+					int nPeers = i->list_peers;
+					if(nPeers == 0) {
+						if(infos.nTrackers == 0) {
+							nPeers = -1;
+						} else if(i->current_tracker == "") {
+							nPeers = -2;
+						}
+					}
+
+					std::cout
+						<< i->num_peers << ";"
+						<< nPeers << ";"
+						<< i->download_rate << ";"
+						<< (hdl.flags() & torrent_flags::seed_mode) << ";"
+						<< i->total_wanted_done << ";"
+						<< i->total_wanted << ";"
+						<< i->distributed_full_copies << std::endl;
 
 
-				std::cerr << i->name
-					<< ":" << i->sequential_download
-					<< ":" << (i->total_payload_download/1024)
-					<< "/" << (infos.fileSize/1024)
-					<< "\n\tfileSize = " << infos.fileSize
-					<< "\n\tnTotalPieces = " << infos.nTotalPieces
-					<< "\n\tfirstPiece = " << infos.firstPiece
-					<< "\n\tlastPiece = " << infos.lastPiece
-					<< "\n\toffset = " << infos.offset
-					<< "\n\tfileNPieces = " << infos.nPieces
-					<< std::endl;
+					std::cerr << i->name
+						<< ":" << (hdl.flags() & torrent_flags::sequential_download)
+						<< ":" << (i->total_payload_download/1024)
+						<< "/" << (infos.fileSize/1024)
+						<< "\n\tfileSize = " << infos.fileSize
+						<< "\n\tnTotalPieces = " << infos.nTotalPieces
+						<< "\n\tfirstPiece = " << infos.firstPiece
+						<< "\n\tlastPiece = " << infos.lastPiece
+						<< "\n\toffset = " << infos.offset
+						<< "\n\tfileNPieces = " << infos.nPieces
+						<< std::endl;
 
-					bitfield pieces = i->pieces;
-					setFileInfos(infos.path, infos.fileSize, [=](long long off, long long size) -> long long {
-							int start = (off + infos.offset) / infos.pieceLength;
+						bitfield pieces = i->pieces;
+						setFileInfos(infos.path, infos.fileSize, [=](long long off, long long size) -> long long {
+								int start = (off + infos.offset) / infos.pieceLength;
 
-							long long res = 0;
-							if(!pieces[start])
-								return 0;
-							res = infos.pieceLength - (infos.offset%infos.pieceLength);
+								long long res = 0;
+								if(!pieces[start])
+									return 0;
+								res = infos.pieceLength - (infos.offset%infos.pieceLength);
 
-							int pos = start+1;
-							while(res < size) {
-								if(pos > infos.lastPiece)
-									break;
+								int pos = start+1;
+								while(res < size) {
+									if(pos > infos.lastPiece)
+										break;
 
-								if(!pieces[pos])
-									break;
+									if(!pieces[pos])
+										break;
 
-								if(pos == infos.lastPiece) {
-									res = infos.fileSize - off;
-									break;
+									if(pos == infos.lastPiece) {
+										res = infos.fileSize - off;
+										break;
+									}
+
+									res += infos.pieceLength;
+									++pos;
 								}
 
-								res += infos.pieceLength;
-								++pos;
-							}
-
-							if(res>size)
-								res = size;
-							return res;
-						});
+								if(res>size)
+									res = size;
+								return res;
+							});
+				}
+			} else {
+				std::cerr << alert->message() << std::endl;
 			}
-		} else {
-			std::cerr << alert->message() << std::endl;
 		}
 	}
 
