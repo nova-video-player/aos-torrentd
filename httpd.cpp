@@ -236,18 +236,18 @@ static void giveContentLength(SocketHelper& fd, std::pair<long long, long long> 
 	fd.writeString(str.c_str());
 
 	if(range.first) {
-		str = "Content-Range: ";
+		str = "Content-Range: bytes ";
 		//Start
 		str += boost::lexical_cast<std::string>(range.first);
 		str += "-";
 		//-End
-		if(range.second)
+		if(range.second && range.second != -1)
 			str += boost::lexical_cast<std::string>(range.second);
 		else
-			str += boost::lexical_cast<std::string>(fileSize);
+			str += boost::lexical_cast<std::string>(fileSize-1);
 		// /size
 		str += "/";
-		str += boost::lexical_cast<std::string>(size);
+		str += boost::lexical_cast<std::string>(fileSize);
 		str += "\r\n";
 		fd.writeString(str.c_str());
 	}
@@ -303,6 +303,7 @@ static void serveFile(std::unordered_map<std::string, std::string>& request, int
 		int fail = 0;
 		//while(filePath && file != -1 && currentOffset < maxOffset && (currentOffset < range.second || range.second == -1LL)) {
 		while(filePath && file != -1 && (currentOffset < range.second || range.second == -1LL)) {
+			lseek(file, currentOffset, SEEK_SET);
 			char buffer[1024];
 			int length = availableData(currentOffset, sizeof(buffer));
 			if(!length)
@@ -322,7 +323,7 @@ static void serveFile(std::unordered_map<std::string, std::string>& request, int
 				break;
 			}
 
-			currentOffset += res;
+			currentOffset += res2;
 		}
 		deleteRange(range);
 		range.first = currentOffset;
