@@ -67,17 +67,18 @@ extern void start_httpd();
 extern void setFileInfos(const char *filePath, long long fileSize, std::function<long long (long long, long long)>);
 extern std::list<std::pair<long long, long long> > getRanges();
 
+static session* _myLibtorrentSession;
 session* s() {
-	static session* _v;
-	if(!_v)
-		_v = new session();
-	return _v;
+	if(!_myLibtorrentSession)
+		_myLibtorrentSession = new session();
+	return _myLibtorrentSession;
 }
 
 void end(int sig) {
 	(void)sig;
-	entry session_state;
-	s()->save_state(session_state);
+    auto state = s()->session_state();
+
+    auto session_state = write_session_params(state);
 
 	std::vector<char> out;
 	bencode(std::back_inserter(out), session_state);
@@ -127,7 +128,9 @@ static int init_torrentd() {
 				fprintf(stderr, "failed loading saved state: %s\n", ec.message().c_str());
 			} else {
 				std::cerr << "Loading saved state..." << std::endl;
-				s()->load_state(e);
+                auto params = read_session_params(in);
+                if(_myLibtorrentSession) std::cerr << "Can't restore session because it is already started" << std::endl;
+                _myLibtorrentSession = new session(params);
 			}
 		}
 	}
@@ -155,7 +158,7 @@ static void load_blocklist(char *path) {
 		if(!str)
 			continue;
 		str++;
-		unsigned int a,b,c,d,e,f,g,h, flags;
+		unsigned int a,b,c,d,e,f,g,h;
 		if(sscanf(str, "%u.%u.%u.%u-%u.%u.%u.%u", &a, &b, &c, &d, &e, &f, &g, &h) != 8)
 			continue;
 
@@ -172,12 +175,17 @@ static void add_torrent(const char* torrent) {
 	error_code ec;
 	add_torrent_params p;
 	p.save_path = "./";
+
+    //This one is if "torrent" is a local file
 	p.ti.reset(new torrent_info(torrent, ec));
-	//Try to parse as a file
+
+    //if it failed then try other things
 	if(ec) {
 		p.ti = nullptr;
+        //Ask to parse it as http:// <DEPRECATED>
 		p.url = torrent;
-		//Don't actually care for error, might just be not a magnet
+
+		//Try to parse it as a magnet
 		parse_magnet_uri(torrent, p, ec);
 	}
 
@@ -271,7 +279,7 @@ int main(int argc, char* argv[])
 					}
 
 					//Compute pieces priorities
-					std::vector<int> priorities(infos.nTotalPieces, 0);
+					std::vector<download_priority_t> priorities(infos.nTotalPieces, dont_download);
 					//Please note that streaming mode is on
 					//So early pieces are prefered by default
 					auto ranges = getRanges();
@@ -280,18 +288,18 @@ int main(int argc, char* argv[])
 					for(int j = infos.firstPiece;
 							j<= infos.lastPiece && j <infos.nTotalPieces;
 							++j)
-						priorities[j] = 1;
+						priorities[j] = low_priority;
 					//We will most likely need the end of the file
 					//Either because of mkv/mp4, or to fingerprint subtitles
 					if(infos.lastPiece >= infos.nTotalPieces) {
 						std::cerr << "lastPiece >= TotalPieces" << std::endl;
 					} else {
-						priorities[infos.lastPiece] = 7;
+						priorities[infos.lastPiece] = top_priority;
 					}
 
 					//To support seeking, we do two things:
 					//- Highly prioritize 10MB around current data cursor
-					//- We determine lowest requested byte, so we can null-prioritize data already skipped
+					// // - We determine lowest requested byte, so we can null-prioritize data already skipped
 					long long earliest = infos.fileSize;
 					for(auto it = ranges.begin(); it != ranges.end(); ++it) {
 						if(it->first < earliest)
@@ -307,7 +315,7 @@ int main(int argc, char* argv[])
 							int pos = j+pieceN;
 							if( pos > infos.lastPiece)
 								break;
-							priorities[pos] = 7;
+							priorities[pos] = top_priority;
 						}
 					}
 
