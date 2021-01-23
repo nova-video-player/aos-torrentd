@@ -351,26 +351,34 @@ int main(int argc, char* argv[])
 
 						bitfield pieces = i->pieces;
 						setFileInfos(infos.path, infos.fileSize, [=](long long off, long long size) -> long long {
+								//Piece number of the start of $off in file
 								int start = (off + infos.offset) / infos.pieceLength;
 
 								long long res = 0;
 								if(!pieces[start])
 									return 0;
-								res = infos.pieceLength - (infos.offset%infos.pieceLength);
 
+								// Since we have current piece, we can at least read what's left from current offset to the end of the piece
+								res = infos.pieceLength - ( (off + infos.offset ) %infos.pieceLength);
+
+								// Now count how many (full) pieces we can still get from here.
 								int pos = start+1;
 								while(res < size) {
+									//We're beyond current file, stop here
 									if(pos > infos.lastPiece)
 										break;
 
+									// Next piece isn't available, that's all we can read
 									if(!pieces[pos])
 										break;
 
+									// If we arrived at the last piece, we managed to get all the pieces of the file, so we can read everything
 									if(pos == infos.lastPiece) {
 										res = infos.fileSize - off;
 										break;
 									}
 
+									// Got one more piece to read
 									res += infos.pieceLength;
 									++pos;
 								}
