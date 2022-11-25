@@ -26,7 +26,7 @@ LOCAL_MODULE:= torrentd
 LOCAL_CFLAGS += -I$(REPO_TOP_DIR)/native/boost/boost_1_80_0
 LOCAL_LDLIBS= $(REPO_TOP_DIR)/native/boost/boost_1_80_0-$(TARGET_ARCH_ABI)/boost/bin.v2/libs/system/build/clang-$(os)-android/release/cxxstd-14-iso/link-static/target-os-android/threading-multi/visibility-hidden/libboost_system.a
 LOCAL_CFLAGS += -I$(REPO_TOP_DIR)/native/libtorrent-android-builder/libtorrent/include
-LOCAL_LDLIBS += $(REPO_TOP_DIR)/native/boost/boost_1_80_0-$(TARGET_ARCH_ABI)/torrent/clang-$(os)-android/release/cxxstd-14-iso/link-static/target-os-android/threading-multi/libtorrent.a
+LOCAL_LDLIBS += $(REPO_TOP_DIR)/native/boost/boost_1_80_0-$(TARGET_ARCH_ABI)/torrent/clang-$(os)-android/release/crypto-openssl/cxxstd-14-iso/link-static/target-os-android/threading-multi/libtorrent.a
 
 LOCAL_LDLIBS += -latomic
 
