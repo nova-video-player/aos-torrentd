@@ -82,6 +82,7 @@ void end(int sig) {
 
 	std::vector<char> out;
 	bencode(std::back_inserter(out), session_state);
+        unlink(".ses_sate");
 	int fd = open(".ses_state", O_WRONLY|O_CREAT, 0644);
 	write(fd, &out[0], out.size());
 	close(fd);
@@ -107,7 +108,7 @@ static void setup() {
 	pack.set_bool(settings_pack::enable_upnp, true);
 	pack.set_bool(settings_pack::enable_lsd, true);
 	pack.set_bool(settings_pack::enable_dht, true);
-	pack.set_int(settings_pack::alert_mask, alert::error_notification);
+	pack.set_int(settings_pack::alert_mask, 0x7fffffff);
 
 	s()->apply_settings(pack);
 }
@@ -128,10 +129,11 @@ static int init_torrentd() {
 				fprintf(stderr, "failed loading saved state: %s\n", ec.message().c_str());
 			} else {
 				std::cerr << "Loading saved state..." << std::endl;
-                auto params = read_session_params(in);
-                if(_myLibtorrentSession) std::cerr << "Can't restore session because it is already started" << std::endl;
-                _myLibtorrentSession = new session(params);
-			}
+                                auto params = read_session_params(in);
+                                if(_myLibtorrentSession) std::cerr << "Can't restore session because it is already started" << std::endl;
+                                _myLibtorrentSession = new session(params);
+                        }
+                        close(loadFd);
 		}
 	}
 
