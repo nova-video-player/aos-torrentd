@@ -102,7 +102,7 @@ static void setup() {
 			"dht.transmissionbt.com:6881");
 
 	pack.set_int(settings_pack::max_retry_port_bind, 20);
-	pack.set_str(settings_pack::listen_interfaces, "[::]:9042");
+	pack.set_str(settings_pack::listen_interfaces, "[::]:9042,0.0.0.0:9043");
 	pack.set_bool(settings_pack::enable_natpmp, true);
 	pack.set_bool(settings_pack::enable_upnp, true);
 	pack.set_bool(settings_pack::enable_lsd, true);
