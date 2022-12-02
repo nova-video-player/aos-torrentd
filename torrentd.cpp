@@ -108,7 +108,8 @@ static void setup() {
 	pack.set_bool(settings_pack::enable_upnp, true);
 	pack.set_bool(settings_pack::enable_lsd, true);
 	pack.set_bool(settings_pack::enable_dht, true);
-	pack.set_int(settings_pack::alert_mask, 0x7fffffff);
+	// pack.set_int(settings_pack::alert_mask, 0x7fffffff);
+        pack.set_int(settings_pack::alert_mask, alert::error_notification);
 
 	s()->apply_settings(pack);
 }
