@@ -19,6 +19,7 @@
 #include <linux/prctl.h>
 #include <sys/prctl.h>
 #include <iostream>
+#include <vector>
 #include "libtorrent/alert.hpp"
 #include "libtorrent/alert_types.hpp"
 #include "libtorrent/announce_entry.hpp"

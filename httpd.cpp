@@ -28,6 +28,7 @@
 #include <string.h>
 
 #include <iostream>
+#include <vector>
 #include <thread>
 #include <mutex>
 #include <string>
