@@ -13,4 +13,5 @@
 # limitations under the License.
 
 LOCAL_PATH := $(call my-dir)
+LOCAL_LDFLAGS = -Wl,-z,max-page-size=16384
 include $(LOCAL_PATH)/../Android.mk
