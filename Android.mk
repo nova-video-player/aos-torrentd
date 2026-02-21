@@ -23,11 +23,11 @@ LOCAL_SRC_FILES := torrentd.cpp httpd.cpp \
 
 LOCAL_MODULE:= torrentd
 
-LOCAL_CFLAGS += -I$(REPO_TOP_DIR)/native/boost/boost-1.89.0
+LOCAL_CFLAGS += -I$(REPO_TOP_DIR)/native/boost/boost-1.90.0
 LOCAL_CFLAGS += -I$(REPO_TOP_DIR)/native/libtorrent-android-builder/libtorrent/include
-LOCAL_LDLIBS += $(REPO_TOP_DIR)/native/boost/boost-1.89.0-$(TARGET_ARCH_ABI)/torrent/clang-$(os)-android/release/cxxstd-14-iso/link-static/target-os-android/threading-multi/visibility-hidden/libtorrent-rasterbar.a
-LOCAL_LDLIBS += $(REPO_TOP_DIR)/native/openssl-android-builder/dist-$(TARGET_ARCH_ABI)/lib/libssl.a
-LOCAL_LDLIBS += $(REPO_TOP_DIR)/native/openssl-android-builder/dist-$(TARGET_ARCH_ABI)/lib/libcrypto.a
+LOCAL_LDLIBS += $(REPO_TOP_DIR)/native/boost/boost-1.90.0-$(TARGET_ARCH_ABI)/torrent/clang-$(os)-android/release/cxxstd-14-iso/link-static/target-os-android/threading-multi/visibility-hidden/libtorrent-rasterbar.a
+LOCAL_LDLIBS += $(REPO_TOP_DIR)/native/prebuilt/openssl/dist-$(TARGET_ARCH_ABI)/lib/libssl.a
+LOCAL_LDLIBS += $(REPO_TOP_DIR)/native/prebuilt/openssl/dist-$(TARGET_ARCH_ABI)/lib/libcrypto.a
 
 LOCAL_LDLIBS += -latomic
 
